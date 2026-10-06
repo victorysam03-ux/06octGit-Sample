@@ -1,0 +1,86 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - new-feature
+  pull_request:
+    branches:
+      - main
+      - new-feature
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # ----------------------------------------------------
+  # CI Job: Continuous Integration (Test & Lint)
+  # ----------------------------------------------------
+  ci-build-and-test:
+    name: CI - Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run CI Smoke Tests & HTML Validation
+        run: |
+          echo "=========================================="
+          echo " Running CI Smoke Tests & Validations "
+          echo "=========================================="
+
+          # Check essential files
+          if [ ! -f "index.html" ]; then
+            echo "Error: index.html not found!"
+            exit 1
+          fi
+
+          echo "✓ index.html found"
+          echo "✓ Validating basic HTML tags..."
+
+          # Basic validation for HTML structure
+          grep -q "<!DOCTYPE html>" index.html || (echo "Missing DOCTYPE in index.html" && exit 1)
+          grep -q "<html>\|<html " index.html || (echo "Missing <html> tag in index.html" && exit 1)
+          grep -q "</html>" index.html || (echo "Missing </html> tag in index.html" && exit 1)
+
+          echo "✓ HTML structure validation passed!"
+          echo "=========================================="
+          echo " CI Stage Completed Successfully! 🚀 "
+          echo "=========================================="
+
+  # ----------------------------------------------------
+  # CD Job: Continuous Deployment to GitHub Pages
+  # ----------------------------------------------------
+  cd-deploy:
+    name: CD - Deploy to GitHub Pages
+    needs: ci-build-and-test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
